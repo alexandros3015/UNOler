@@ -566,7 +566,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                         game_state.reverse();
                     }
                 },
-                _ => {},
+                SpecialCard::Base => {},
             }
         }
                 
