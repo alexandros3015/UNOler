@@ -4,4 +4,4 @@ version = 4
 
 [[package]]
 name = "UNOler_static"
-version = "0.2.0"
+version = "0.2.1"
