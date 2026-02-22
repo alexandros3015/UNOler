@@ -17,7 +17,7 @@ Or, you can download the binary from the releases page.
 
 - Supports multiple players
 - Supports color choices
-- Supports plus fours and plus twos
+- Supports plus fours and twos
 - Supports reverses
 - Supports custom OS-specific randomization
 
@@ -39,6 +39,11 @@ Or you could just take it and make it yourself.
 2. Discard a card from your hand if it is a legal play.
 3. Use "d" or "draw" to draw a card or "s" or "see" to see your hand.
 4. The first player to run out of cards wins.
+
+## Rules
+
+See the full game rules here:  
+[RULES.md](RULES.md)
 
 ## License
 
