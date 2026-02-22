@@ -207,12 +207,11 @@ struct UNOCard {
     color: Color,
     special: SpecialCard,
     number: i8,
-    spent: bool,
 }
 
 impl UNOCard {
     fn new(color: Color, special: SpecialCard, number: i8) -> Self {
-        UNOCard { color: color, special: special, number: number, spent: false }
+        UNOCard { color: color, special: special, number: number }
     }
 }
 
