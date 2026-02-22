@@ -429,7 +429,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     println!("\n------------\n");
     
     let mut game_state = Game::new(0, players as i8,1); // The game state
-    let mut add_queue: u8 = 0; // The queue for adding cards to the next player
+    let mut add_queue: u32 = 0; // The queue for adding cards to the next player
     let mut getting_added_to: bool; // Whether or not the player is getting cards added to them
     let mut skipped: bool = false; // Whether or not the player has been skipped
     let mut discard: Vec<UNOCard> = Vec::new(); // The discard pile
@@ -453,11 +453,11 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         let countercards = check_countercards(player_hand);
         
         let mut answer: String;
-        let card_selected: UNOCard;
+        let card_selected: Option<UNOCard>;
         loop {
             // If the player cannot counter the current plus two and the adding queue is not empty, then add the cards to the player
             if !countercards && add_queue > 0 {
-                card_selected = last_played;
+                card_selected = None;
                 getting_added_to = false;
                 for _ in 0..add_queue {
                     
@@ -475,7 +475,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             } else if skipped {
                 println!("You have been skipped!");
                 skipped = false;
-                card_selected = last_played;
+                card_selected = None;
                 break;
             }
         
@@ -527,62 +527,50 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             } 
             // If the card is valid, then play it
             else {
-                card_selected = player_hand[answer_usize];
-                discard.push( card_selected );
+                card_selected = Some(player_hand[answer_usize]);
+                discard.push( card_selected.unwrap() );
                 player_hand.remove(answer_usize);
-                println!("Card selected: {}", format_card_message(&card_selected));
+                println!("Card selected: {}", format_card_message(&card_selected.unwrap()));
                 break;
             }
         }
-        
-        last_played = card_selected;
         
         // We're gonna do some spins on the rules here 
         // So for one +4s CANNOT be countererd, but they can be played on a +2
         // Adding cards will only work if you have a skip card, if that is the case then you are immune until you play 
         // If not, you're drawing right now
-        
-        // Skip cards and reverse if the game has two players
-        if (card_selected.special == SpecialCard::Skip || (card_selected.special == SpecialCard::Reverse && players == 2)) && !last_played.spent {
-            skipped = true;
-            last_played.spent = true;
+        if let Some(card) = card_selected {
+            last_played = card;
+
+            match card.special {
+                SpecialCard::PlusFour => {
+                    let chosen_color: Color = input("Enter color", "Please enter an UNO color");
+                    last_played.color = chosen_color;
+
+                    add_queue += 4;
+                    getting_added_to = false;
+                    skipped = true;
+                },
+                SpecialCard::PlusTwo => {
+                    add_queue += 2;
+                    getting_added_to = false;
+                },
+                SpecialCard::ColorChange => {
+                    let chosen_color: Color = input("Enter color", "Please enter an UNO color");
+                    last_played.color = chosen_color;
+                },
+                SpecialCard::Skip => skipped = true,
+                SpecialCard::Reverse => {
+                    if game_state.max_players == 2 {
+                        skipped = true;
+                    } else {
+                        game_state.reverse();
+                    }
+                },
+                _ => {},
+            }
         }
-        
-        // Reverse if the card is a reverse
-        else if card_selected.special == SpecialCard::Reverse && !last_played.spent {
-            game_state.reverse();
-            println!("Reversed!");
-            last_played.spent = true;
-        }
-        
-        // Plus fours if the card is a plus four
-        // Add 4 cards to the queue
-        // Also garuntee a skip, meaning that the card is not counterable
-        if card_selected.special == SpecialCard::PlusFour && !last_played.spent {
-            skipped = true;
-            add_queue += 4;
-            
-            let chosen_color: Color = input("Enter color", "Please enter an UNO color");
-            last_played.color = chosen_color;
-            getting_added_to = false;
-            last_played.spent = true
-        }
-        
-        // Color change if the card is a wild card
-        if card_selected.special == SpecialCard::ColorChange && !last_played.spent {
-            let chosen_color: Color = input("Enter color", "Please enter an UNO color");
-            last_played.color = chosen_color;
-            last_played.spent = true
-        }
-        
-        // Plus twos if the card is a plus two
-        // Add 2 cards to the queue
-        // This can be countered, unlike plus fours
-        if card_selected.special == SpecialCard::PlusTwo && !last_played.spent {
-            add_queue += 2;
-            getting_added_to = false;
-            last_played.spent = true
-        }
+                
         
         // If the player has a countercard but decided not to use it, then they draw at the end of the turn
         if getting_added_to && countercards && add_queue > 0 {
