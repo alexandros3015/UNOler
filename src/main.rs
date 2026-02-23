@@ -590,7 +590,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             println!("UNO");
         }
         
-        // Exit the loop is a player has won (no cards left)
+        // Exit the loop if a player has won (no cards left)
         if player_hand.len() == 0 {
             println!("Player #{} wins!", game_state.player_number());
             break;
