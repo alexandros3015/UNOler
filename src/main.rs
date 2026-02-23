@@ -1,4 +1,3 @@
-
 use std::io::{self, Write, Result, Error, ErrorKind};
 use std::str::FromStr;
 use std::fmt::Display;
@@ -215,6 +214,26 @@ impl UNOCard {
     }
 }
 
+
+#[derive(Debug, Copy, Clone)]
+enum Difficulty {
+    Calm,
+    Aggressive
+}
+
+impl FromStr for Difficulty {
+    type Err = String;
+    
+    fn from_str(s: &str) -> std::result::Result< Self, Self::Err > {
+        let sl = s.to_lowercase();
+        match sl.as_str() {
+            "calm" => Ok(Difficulty::Calm),
+            "aggressive" => Ok(Difficulty::Aggressive),
+            _ => Err( format!("{} is not an avaliable difficulty", s) ),
+        }
+    }
+}
+
 // Current game state, handling turns and reverses
 #[derive(Debug, Copy, Clone)]
 struct Game {
@@ -374,24 +393,137 @@ fn clear_terminal() {
     std::io::stdout().flush().unwrap();
 }
 
+// This is for the AI players
+fn get_move_ai(hand: &Vec<UNOCard>, last_played: UNOCard, difficulty: Difficulty) -> Option<usize> {
+    
+    // To adhere to the +2 stacking force
+    if last_played.special == SpecialCard::PlusTwo && check_countercards(hand) {
+        if let Some(idx) = hand.iter().position(|c| {
+            c.special == SpecialCard::PlusTwo ||
+            c.special == SpecialCard::PlusFour
+        }) {
+            return Some(idx);
+        }
+    }
+    
+    match difficulty {
+        // Saves special cards for last
+        Difficulty::Calm => {
+            if let Some(idx) = hand.iter().position(
+                |c| { c.special == SpecialCard::Base && allowed_move(*c, last_played) }
+            ) {
+                return Some(idx);
+            }
+            
+            if let Some(idx) = hand.iter().position(|c| {
+                c.special != SpecialCard::Base &&
+                c.special != SpecialCard::PlusFour &&
+                c.special != SpecialCard::ColorChange &&
+                allowed_move(*c, last_played)
+            }) {
+                return Some(idx);
+            }
+            
+            if let Some(idx) = hand.iter().position(|c| {
+                c.special == SpecialCard::PlusFour || c.special == SpecialCard::ColorChange
+            }) {
+                return Some(idx);
+            }
+        },
+        
+        // Uses disruption cards immediately
+        Difficulty::Aggressive => {
+            if let Some(idx) = hand.iter().position(|c| {
+                c.special == SpecialCard::PlusFour
+            }) {
+                return Some(idx);
+            }
+            
+            if let Some(idx) = hand.iter().position(|c| {
+                (c.special == SpecialCard::PlusTwo ||
+                c.special == SpecialCard::Skip ||
+                c.special == SpecialCard::Reverse) &&
+                allowed_move(*c, last_played)
+            }) {
+                return Some(idx);
+            }
+            
+            if let Some(idx) = hand.iter().position(|c| {
+                (c.special == SpecialCard::ColorChange || c.special == SpecialCard::Base) &&
+                allowed_move(*c, last_played)
+            }) {
+                return Some(idx);
+            }
+        },
+        
+    }
+    
+    // Draw
+    None
+}
+
+// Gets the most common color on the deck
+fn get_common_color(hand: &Vec<UNOCard>, rand: &mut Randler) -> Color {
+
+    // Counts all colors
+    let reds: usize = hand
+        .iter()
+        .filter(|&card| card.color == Color::Red)
+        .count();
+
+    let blues: usize = hand
+        .iter()
+        .filter(|&card| card.color == Color::Blue)
+        .count();
+        
+    let yellows: usize = hand
+        .iter()
+        .filter(|&card| card.color == Color::Yellow)
+        .count();
+        
+    let greens: usize = hand
+        .iter()
+        .filter(|&card| card.color == Color::Green)
+        .count();
+    
+    // Returns the most common color
+    if reds > blues && reds > yellows && reds > greens {
+        return Color::Red;
+    }
+    else if blues > yellows && blues >  greens {
+        return Color::Blue;
+    } else if yellows > greens {
+        return Color::Yellow;
+    } else if greens > 0 {
+        return Color::Green;
+    }
+    
+    // If there is no common color, return a random color
+    color_from_number( rand.rand_range(0, 3).unwrap_or(0) as u8 ).unwrap_or(Color::Red)
+}
+
 fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 
     
     let players: u8 = input("How many players?", "Please enter a proper number that is not too big.");
+    let ai_players: u8 = input("How many AI players?", "Please enter a proper number that is not too big.");
+    let total_players: u8 = players + ai_players;
+    
+    let difficulty: Difficulty = input("What AI difficulty? (calm or aggressive)", "Please enter a proper difficulty");
     
     let mut rand = Randler::default();
     
     // Warnings
-    if players == 0 {
+    if total_players == 0 {
         println!("ZERO PLAYERS?? Without a doubt. Right away sir!");
         println!("Player 0 wins? Is this the outcome you desire?");
         return Ok(());
     }
-    if players == 1 {
+    if total_players == 1 {
         println!("Sure bro, one player");
-    } else if players == 2 {
+    } else if total_players == 2 {
         println!("WARNING: Reverse cards now count as skip cards!");
-    } else if players > 10 {
+    } else if total_players > 10 {
         println!("WARNING: Playing with this many players may cause unexpected behavior!");
     }
     
@@ -402,7 +534,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     shuffle(&mut deck, &mut rand);
     
     // Give seven cards to each player
-    for _ in 0..players {
+    for _ in 0..total_players {
         let mut temp: Vec<UNOCard> = Vec::new();
         for _ in 0..7 {
             if deck.is_empty() {
@@ -427,7 +559,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     
     println!("\n------------\n");
     
-    let mut game_state = Game::new(0, players as i8,1); // The game state
+    let mut game_state = Game::new(0, total_players as i8,1); // The game state
     let mut add_queue: u32 = 0; // The queue for adding cards to the next player
     let mut getting_added_to: bool; // Whether or not the player is getting cards added to them
     let mut skipped: bool = false; // Whether or not the player has been skipped
@@ -436,24 +568,32 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     loop {
         getting_added_to = true;
         
-        let player_hand = &mut game[(game_state.player_number() - 1) as usize]; // The player's hand
+        let current_idx = game_state.player_number() - 1;
+
+        let player_hand = &mut game[current_idx as usize]; // The player's hand
         
+        let is_ai: bool = current_idx >= players as i8;
+
         player_hand.sort();
         
         println!("\nPlayer #{}'s turn!", game_state.player_number());
         println!("Last card played: {}\n", format_card_message(&last_played));
         
-        for (index, item) in player_hand.iter().enumerate() {
-            println!("{}. {}", index + 1,format_card_message(item));
-        }
-        println!("Type \"d\" or \"draw\" to draw a card");
-        println!("Type \"s\" or \"see\" to see the last played card and your hand again");
-
-        let countercards = check_countercards(player_hand);
+        if is_ai { println!("AI player!"); }
         
+        if !is_ai {
+            for (index, item) in player_hand.iter().enumerate() {
+                println!("{}. {}", index + 1,format_card_message(item));
+            }
+            println!("Type \"d\" or \"draw\" to draw a card");
+            println!("Type \"s\" or \"see\" to see the last played card and your hand again");
+        }
+        
+        let countercards = check_countercards(player_hand);
         let mut answer: String;
         let card_selected: Option<UNOCard>;
         loop {
+            
             // If the player cannot counter the current plus two and the adding queue is not empty, then add the cards to the player
             if !countercards && add_queue > 0 {
                 card_selected = None;
@@ -477,60 +617,83 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                 card_selected = None;
                 break;
             }
-        
+            
             player_hand.sort();
-
-            println!("What would you like to play (or draw)?");
-            answer = input("Enter", "Please enter a card that you have!");
             
-            answer = answer.to_lowercase();
-            
-            // If the player wants to draw a card, then draw a card
-            if answer == "draw" || answer == "d" {
-            
-                ensure_deck_full(&mut deck, &mut discard, &mut rand);
+            if is_ai {
+                let ai_move: Option<usize> = get_move_ai(player_hand, last_played, difficulty);
                 
-                let drawed: UNOCard = deck.pop().ok_or("Error, out of cards")?;
-                player_hand.push(drawed);
-                println!("Drawed card: {}\n", format_card_message(&drawed));
-            // Display the last played card and the player's hand
-            } else if answer == "s" || answer == "see" {
-                
-                println!("Last card played: {}\n", format_card_message(&last_played));
-                for (index, item) in player_hand.iter().enumerate() {
-                    println!("{}. {}", index + 1,format_card_message(item));
+                if let Some( play_move ) = ai_move {
+                    card_selected = Some(player_hand[play_move]);
+                    discard.push( card_selected.unwrap() );
+                    player_hand.remove(play_move);
+                    
+                    println!("AI card selected: {}", format_card_message(&card_selected.unwrap()));
+                    break;
                 }
-
-                println!("Type \"d\" or \"draw\" to draw a card");
-                println!("Type \"s\" or \"see\" to see the last played card and your hand again");
-                continue;
+                else {
+                    ensure_deck_full(&mut deck, &mut discard, &mut rand);
+                    
+                    let drawed: UNOCard = deck.pop().ok_or("Error, out of cards")?;
+                    player_hand.push(drawed);
+                    println!("AI drew a card");
+                }
             }
-            // Parse the answer
-            let Ok(answer_usize) = answer.trim().parse::<usize>() else {
-                continue; 
-            };
-            
-            // Ensure the answer is within the bounds of the player's hand
-            if answer_usize <= 0 {
-                println!("Please enter a card that you can use");
-                continue;
-            }
-            
-            let answer_usize = (answer_usize -1) as usize; // Zero indexing fix
-            
-            // Check if the card is valid
-            if answer_usize >= player_hand.len() {
-                println!("Please enter a card that you have!\n");
-            } else if !allowed_move(player_hand[answer_usize], last_played) {
-                println!("Playing a {} is not allowed. Pick another card or draw.\n", format_card_message(&player_hand[answer_usize]));
-            } 
-            // If the card is valid, then play it
             else {
-                card_selected = Some(player_hand[answer_usize]);
-                discard.push( card_selected.unwrap() );
-                player_hand.remove(answer_usize);
-                println!("Card selected: {}", format_card_message(&card_selected.unwrap()));
-                break;
+        
+    
+                println!("What would you like to play (or draw)?");
+                answer = input("Enter", "Please enter a card that you have!");
+                
+                answer = answer.to_lowercase();
+                
+                // If the player wants to draw a card, then draw a card
+                if answer == "draw" || answer == "d" {
+                
+                    ensure_deck_full(&mut deck, &mut discard, &mut rand);
+                    
+                    let drawed: UNOCard = deck.pop().ok_or("Error, out of cards")?;
+                    player_hand.push(drawed);
+                    println!("Drawed card: {}\n", format_card_message(&drawed));
+                // Display the last played card and the player's hand
+                } else if answer == "s" || answer == "see" {
+                    
+                    println!("Last card played: {}\n", format_card_message(&last_played));
+                    for (index, item) in player_hand.iter().enumerate() {
+                        println!("{}. {}", index + 1,format_card_message(item));
+                    }
+    
+                    println!("Type \"d\" or \"draw\" to draw a card");
+                    println!("Type \"s\" or \"see\" to see the last played card and your hand again");
+                    continue;
+                }
+                // Parse the answer
+                let Ok(answer_usize) = answer.trim().parse::<usize>() else {
+                    continue; 
+                };
+                
+                // Ensure the answer is within the bounds of the player's hand
+                if answer_usize <= 0 {
+                    println!("Please enter a card that you can use");
+                    continue;
+                }
+                
+                let answer_usize = (answer_usize -1) as usize; // Zero indexing fix
+                
+                // Check if the card is valid
+                if answer_usize >= player_hand.len() {
+                    println!("Please enter a card that you have!\n");
+                } else if !allowed_move(player_hand[answer_usize], last_played) {
+                    println!("Playing a {} is not allowed. Pick another card or draw.\n", format_card_message(&player_hand[answer_usize]));
+                } 
+                // If the card is valid, then play it
+                else {
+                    card_selected = Some(player_hand[answer_usize]);
+                    discard.push( card_selected.unwrap() );
+                    player_hand.remove(answer_usize);
+                    println!("Card selected: {}", format_card_message(&card_selected.unwrap()));
+                    break;
+                }
             }
         }
         
@@ -543,9 +706,15 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 
             match card.special {
                 SpecialCard::PlusFour => {
-                    let chosen_color: Color = input("Enter color", "Please enter an UNO color");
-                    last_played.color = chosen_color;
-
+                
+                    if is_ai {
+                        last_played.color = get_common_color(player_hand, &mut rand);
+                    }
+                    else {
+                        let chosen_color: Color = input("Enter color", "Please enter an UNO color");
+                        last_played.color = chosen_color;
+                    }
+                    
                     add_queue += 4;
                     getting_added_to = false;
                     skipped = true;
@@ -555,12 +724,17 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                     getting_added_to = false;
                 },
                 SpecialCard::ColorChange => {
-                    let chosen_color: Color = input("Enter color", "Please enter an UNO color");
-                    last_played.color = chosen_color;
+                    if is_ai {
+                        last_played.color = get_common_color(player_hand, &mut rand);
+                    }
+                    else {
+                        let chosen_color: Color = input("Enter color", "Please enter an UNO color");
+                        last_played.color = chosen_color;
+                    }
                 },
                 SpecialCard::Skip => skipped = true,
                 SpecialCard::Reverse => {
-                    if game_state.max_players == 2 {
+                    if total_players == 2 {
                         skipped = true;
                     } else {
                         game_state.reverse();
