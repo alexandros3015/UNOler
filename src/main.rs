@@ -719,7 +719,13 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                     
                     let drawed: UNOCard = deck.pop().ok_or("Error, out of cards")?;
                     player_hand.push(drawed);
-                    println!("Force drawing: {}", format_card_message(&drawed));
+                    
+                    if is_ai {
+                        println!("Force drawing");
+                    }
+                    else {
+                        println!("Force drawing: {}", format_card_message(&drawed));
+                    }
                 }
                 
                 add_queue = 0;
