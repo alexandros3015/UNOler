@@ -218,7 +218,8 @@ impl UNOCard {
 #[derive(Debug, Copy, Clone)]
 enum Difficulty {
     Calm,
-    Aggressive
+    Aggressive,
+    Skilled
 }
 
 impl FromStr for Difficulty {
@@ -229,6 +230,7 @@ impl FromStr for Difficulty {
         match sl.as_str() {
             "calm" => Ok(Difficulty::Calm),
             "aggressive" => Ok(Difficulty::Aggressive),
+            "skilled" => Ok(Difficulty::Skilled),
             _ => Err( format!("{} is not an avaliable difficulty", s) ),
         }
     }
@@ -372,7 +374,13 @@ fn ensure_deck_full(deck: &mut Vec<UNOCard>, discard: &mut Vec<UNOCard>, rand: &
     if deck.is_empty() {
         if discard.len() > 1 {
             println!("Deck empty. Using discard pile...");
-        
+            
+            discard.iter_mut().for_each(|c| {
+                if c.special == SpecialCard::ColorChange || c.special == SpecialCard::PlusFour {
+                    c.color = Color::NA;
+                }
+            });
+            
             let top = discard.pop().unwrap();
             deck.append(discard);
             shuffle(deck, rand);
@@ -394,7 +402,7 @@ fn clear_terminal() {
 }
 
 // This is for the AI players
-fn get_move_ai(hand: &Vec<UNOCard>, last_played: UNOCard, difficulty: Difficulty) -> Option<usize> {
+fn get_move_ai(hand: &Vec<UNOCard>, last_played: UNOCard, difficulty: Difficulty, uno: bool) -> Option<usize> {
     
     // To adhere to the +2 stacking force
     if last_played.special == SpecialCard::PlusTwo && check_countercards(hand) {
@@ -456,15 +464,113 @@ fn get_move_ai(hand: &Vec<UNOCard>, last_played: UNOCard, difficulty: Difficulty
             }
         },
         
+        // "I lost to this AI twice"
+        //                  - Alexandros3015, February 24th, 2026
+        // Ts one is impossible without a god hand
+        Difficulty::Skilled => {
+            if uno {
+                if let Some(idx) = hand.iter().position(|c| {
+                    c.special != SpecialCard::Base &&
+                    allowed_move(*c, last_played)
+                }) {
+                    return Some(idx);
+                }
+            }
+        
+        
+            let (reds, blues, yellows, greens) = count_color(hand);
+            
+            if reds > blues && reds > yellows && reds > greens {
+                if let Some(idx) = hand.iter().position(|c| {
+                    c.color == Color::Red &&
+                    c.special == SpecialCard::Base &&
+                    allowed_move(*c, last_played)
+                }) {
+                    return Some(idx);
+                }
+                
+                if let Some(idx) = hand.iter().position(|c| {
+                    c.color == Color::Red &&
+                    allowed_move(*c, last_played)
+                }) {
+                    return Some(idx);
+                }
+            }
+            else if blues > yellows && blues > greens {
+                if let Some(idx) = hand.iter().position(|c| {
+                    c.color == Color::Blue &&
+                    c.special == SpecialCard::Base &&
+                    allowed_move(*c, last_played)
+                }) {
+                    return Some(idx);
+                }
+                
+                if let Some(idx) = hand.iter().position(|c| {
+                    c.color == Color::Blue &&
+                    allowed_move(*c, last_played)
+                }) {
+                    return Some(idx);
+                }
+            }
+            else if yellows > greens {
+                if let Some(idx) = hand.iter().position(|c| {
+                    c.color == Color::Yellow &&
+                    c.special == SpecialCard::Base &&
+                    allowed_move(*c, last_played)
+                }) {
+                    return Some(idx);
+                }
+                
+                if let Some(idx) = hand.iter().position(|c| {
+                    c.color == Color::Yellow &&
+                    allowed_move(*c, last_played)
+                }) {
+                    return Some(idx);
+                }
+            }
+            
+            else if greens > 0 {
+                if let Some(idx) = hand.iter().position(|c| {
+                    c.color == Color::Green &&
+                    c.special == SpecialCard::Base &&
+                    allowed_move(*c, last_played)
+                }) {
+                    return Some(idx);
+                }
+                
+                if let Some(idx) = hand.iter().position(|c| {
+                    c.color == Color::Green &&
+                    allowed_move(*c, last_played)
+                }) {
+                    return Some(idx);
+                }
+            }
+            
+            if let Some(idx) = hand.iter().position(|c| {
+                c.special == SpecialCard::Base &&
+                allowed_move(*c, last_played)
+            }) {
+                return Some(idx);
+            }
+            
+            if let Some(idx) = hand.iter().position(|c| {
+                c.special == SpecialCard::ColorChange ||
+                c.special == SpecialCard::PlusFour
+            }) {
+                return Some(idx);
+            }
+            
+            
+            
+        },
+        
     }
     
     // Draw
     None
 }
 
-// Gets the most common color on the deck
-fn get_common_color(hand: &Vec<UNOCard>, rand: &mut Randler) -> Color {
-
+fn count_color(hand: &Vec<UNOCard>) -> (usize, usize, usize, usize) {
     // Counts all colors
     let reds: usize = hand
         .iter()
@@ -485,6 +591,14 @@ fn get_common_color(hand: &Vec<UNOCard>, rand: &mut Randler) -> Color {
         .iter()
         .filter(|&card| card.color == Color::Green)
         .count();
+        
+    (reds, blues, yellows, greens)
+}
+
+// Gets the most common color on the deck
+fn get_common_color(hand: &Vec<UNOCard>, rand: &mut Randler) -> Color {
+
+    let (reds, blues, yellows, greens) = count_color(hand);
     
     // Returns the most common color
     if reds > blues && reds > yellows && reds > greens {
@@ -509,7 +623,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let ai_players: u8 = input("How many AI players?", "Please enter a proper number that is not too big.");
     let total_players: u8 = players + ai_players;
     
-    let difficulty: Difficulty = input("What AI difficulty? (calm or aggressive)", "Please enter a proper difficulty");
+    let difficulty: Difficulty = input("What AI difficulty? (calm, aggressive, or skilled)", "Please enter a proper difficulty");
     
     let mut rand = Randler::default();
     
@@ -564,6 +678,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let mut getting_added_to: bool; // Whether or not the player is getting cards added to them
     let mut skipped: bool = false; // Whether or not the player has been skipped
     let mut discard: Vec<UNOCard> = Vec::new(); // The discard pile
+    let mut uno_detection_panic: bool = false;
     
     loop {
         getting_added_to = true;
@@ -582,6 +697,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         if is_ai { println!("AI player!"); }
         
         if !is_ai {
+        
             for (index, item) in player_hand.iter().enumerate() {
                 println!("{}. {}", index + 1,format_card_message(item));
             }
@@ -593,7 +709,6 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         let mut answer: String;
         let card_selected: Option<UNOCard>;
         loop {
-            
             // If the player cannot counter the current plus two and the adding queue is not empty, then add the cards to the player
             if !countercards && add_queue > 0 {
                 card_selected = None;
@@ -621,7 +736,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             player_hand.sort();
             
             if is_ai {
-                let ai_move: Option<usize> = get_move_ai(player_hand, last_played, difficulty);
+                let ai_move: Option<usize> = get_move_ai(player_hand, last_played, difficulty, uno_detection_panic);
                 
                 if let Some( play_move ) = ai_move {
                     card_selected = Some(player_hand[play_move]);
@@ -649,6 +764,10 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                 
                 // If the player wants to draw a card, then draw a card
                 if answer == "draw" || answer == "d" {
+                
+                    if player_hand.len() == 1 && uno_detection_panic {
+                        uno_detection_panic = false;
+                    }
                 
                     ensure_deck_full(&mut deck, &mut discard, &mut rand);
                     
@@ -761,6 +880,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         
         // UNO!
         if player_hand.len() == 1 {
+            uno_detection_panic = true;
             println!("UNO");
         }
         
