@@ -623,7 +623,11 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let ai_players: u8 = input("How many AI players?", "Please enter a proper number that is not too big.");
     let total_players: u8 = players + ai_players;
     
-    let difficulty: Difficulty = input("What AI difficulty? (calm, aggressive, or skilled)", "Please enter a proper difficulty");
+    
+    let difficulty: Difficulty;
+    if ai_players > 0 {
+        difficulty = input("What AI difficulty? (calm, aggressive, or skilled)", "Please enter a proper difficulty");
+    } else {difficulty = Difficulty::Calm}
     
     let mut rand = Randler::default();
     
