@@ -25,7 +25,7 @@ Or, you can download the binary from the releases page.
 ## AI players
 - There are three different modes: calm, aggressive, and skilled
 - Calm plays normal cards first, and only plays special cards if forced
-- Aggressive goes stright into disruption, playing as many special cards as possible
+- Aggressive goes straight into disruption, playing as many special cards as possible
 - Skilled will beat you
 
 ## Limitations
