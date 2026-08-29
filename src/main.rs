@@ -1,11 +1,11 @@
 use std::io::{self, Write, Result, Error, ErrorKind};
 use std::str::FromStr;
-use std::fmt::Display;
+use std::fmt;
 
 fn input<T, E>(message: &str, error: &str) -> T 
 where 
     T: FromStr<Err = E>,
-    E: Display,
+    E: fmt::Display,
     
 {
     let mut u_input = String::new();
@@ -214,6 +214,19 @@ impl UNOCard {
     }
 }
 
+impl fmt::Display for UNOCard {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let color_str = get_color(&self.color);
+        match self.special {
+            SpecialCard::PlusFour => write!(f, "Wild Draw 4 ({})", color_str),
+            SpecialCard::ColorChange => write!(f, "Wild Card ({})", color_str),
+            SpecialCard::PlusTwo => write!(f, "{} Draw 2", color_str),
+            SpecialCard::Skip => write!(f, "{} Skip", color_str),
+            SpecialCard::Reverse => write!(f, "{} Reverse", color_str),
+            SpecialCard::Base => write!(f, "{} {}", color_str, self.number),
+    }
+    }
+}
 
 #[derive(Debug, Copy, Clone)]
 enum Difficulty {
@@ -270,19 +283,6 @@ fn get_color(color: &Color) -> String {
         Color::Yellow => return String::from("Yellow"),
         Color::Green => return String::from("Green"),
         Color::NA => return String::from("None"),
-    }
-}
-
-// Formats the card message to be displayed to the user
-fn format_card_message(card: &UNOCard) -> String {
-    let color_str = get_color(&card.color);
-    match card.special {
-        SpecialCard::PlusFour => format!("Wild Draw 4 ({})", color_str),
-        SpecialCard::ColorChange => format!("Wild Card ({})", color_str),
-        SpecialCard::PlusTwo => format!("{} Draw 2", color_str),
-        SpecialCard::Skip => format!("{} Skip", color_str),
-        SpecialCard::Reverse => format!("{} Reverse", color_str),
-        SpecialCard::Base => format!("{} {}", color_str, card.number),
     }
 }
 
@@ -621,6 +621,11 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     
     let players: u8 = input("How many players?", "Please enter a proper number that is not too big.");
     let ai_players: u8 = input("How many AI players?", "Please enter a proper number that is not too big.");
+    if players as u32 + ai_players as u32 >= 255 {
+        println!("Just stop");
+        return Ok(());
+    }
+    
     let total_players: u8 = players + ai_players;
     
     
@@ -696,14 +701,14 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         player_hand.sort();
         
         println!("\nPlayer #{}'s turn!", game_state.player_number());
-        println!("Last card played: {}\n", format_card_message(&last_played));
+        println!("Last card played: {}\n", last_played);
         
         if is_ai { println!("AI player!"); }
         
         if !is_ai {
         
             for (index, item) in player_hand.iter().enumerate() {
-                println!("{}. {}", index + 1,format_card_message(item));
+                println!("{}. {}", index + 1, item);
             }
             println!("Type \"d\" or \"draw\" to draw a card");
             println!("Type \"s\" or \"see\" to see the last played card and your hand again");
@@ -728,7 +733,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                         println!("Force drawing");
                     }
                     else {
-                        println!("Force drawing: {}", format_card_message(&drawed));
+                        println!("Force drawing: {}", drawed);
                     }
                 }
                 
@@ -753,7 +758,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                     discard.push( card_selected.unwrap() );
                     player_hand.remove(play_move);
                     
-                    println!("AI card selected: {}", format_card_message(&card_selected.unwrap()));
+                    println!("AI card selected: {}", card_selected.unwrap());
                     break;
                 }
                 else {
@@ -776,6 +781,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                 if answer == "draw" || answer == "d" {
                 
                     if player_hand.len() == 1 && uno_detection_panic {
+                        // We do this to keep panic for a while
                         uno_detection_panic = false;
                     }
                 
@@ -783,13 +789,13 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                     
                     let drawed: UNOCard = deck.pop().ok_or("Error, out of cards")?;
                     player_hand.push(drawed);
-                    println!("Drawed card: {}\n", format_card_message(&drawed));
+                    println!("Drawed card: {}\n", drawed);
                 // Display the last played card and the player's hand
                 } else if answer == "s" || answer == "see" {
                     
-                    println!("Last card played: {}\n", format_card_message(&last_played));
+                    println!("Last card played: {}\n", last_played);
                     for (index, item) in player_hand.iter().enumerate() {
-                        println!("{}. {}", index + 1,format_card_message(item));
+                        println!("{}. {}", index + 1, item);
                     }
     
                     println!("Type \"d\" or \"draw\" to draw a card");
@@ -813,14 +819,14 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                 if answer_usize >= player_hand.len() {
                     println!("Please enter a card that you have!\n");
                 } else if !allowed_move(player_hand[answer_usize], last_played) {
-                    println!("Playing a {} is not allowed. Pick another card or draw.\n", format_card_message(&player_hand[answer_usize]));
+                    println!("Playing a {} is not allowed. Pick another card or draw.\n", player_hand[answer_usize]);
                 } 
                 // If the card is valid, then play it
                 else {
                     card_selected = Some(player_hand[answer_usize]);
                     discard.push( card_selected.unwrap() );
                     player_hand.remove(answer_usize);
-                    println!("Card selected: {}", format_card_message(&card_selected.unwrap()));
+                    println!("Card selected: {}", card_selected.unwrap());
                     break;
                 }
             }
@@ -881,7 +887,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                 ensure_deck_full(&mut deck, &mut discard, &mut rand);
                 let drawed: UNOCard = deck.pop().ok_or("Error, out of cards")?;
                 player_hand.push(drawed);
-                println!("Force drawing: {}", format_card_message(&drawed));
+                println!("Force drawing: {}", drawed);
             }
             
             add_queue = 0;
