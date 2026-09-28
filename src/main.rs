@@ -770,8 +770,6 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                 }
             }
             else {
-        
-    
                 println!("What would you like to play (or draw)?");
                 answer = input("Enter", "Please enter a card that you have!");
                 
@@ -787,9 +785,16 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                 
                     ensure_deck_full(&mut deck, &mut discard, &mut rand);
                     
-                    let drawed: UNOCard = deck.pop().ok_or("Error, out of cards")?;
-                    player_hand.push(drawed);
-                    println!("Drawed card: {}\n", drawed);
+                    if !check_countercards(&deck) {
+                        let drawed: UNOCard = deck.pop().ok_or("Error, out of cards")?;
+                        player_hand.push(drawed);
+                        println!("Drawed card: {}\n", drawed);
+                        
+                    }
+                    else {
+                        println!("You have cards that you can play.\n");
+                        continue;
+                    }
                 // Display the last played card and the player's hand
                 } else if answer == "s" || answer == "see" {
                     
