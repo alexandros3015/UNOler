@@ -796,14 +796,14 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 
                     ensure_deck_full(&mut deck, &mut discard, &mut rand);
 
-                    let mut can_play: bool = true;
+                    let mut cannot_play: bool = true;
                     for i in 0..player_hand.len() {
                         if allowed_move(player_hand[i], last_played) {
-                            can_play = false;
+                            cannot_play = false;
                         }
                     }
 
-                    if can_play {
+                    if cannot_play {
                         let drawed: UNOCard = deck.pop().ok_or("Error, out of cards")?;
                         player_hand.push(drawed);
                         println!("Drawed card: {}\n", drawed);
