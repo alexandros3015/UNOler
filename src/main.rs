@@ -796,7 +796,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                     ensure_deck_full(&mut deck, &mut discard, &mut rand);
 
                     let mut can_move: bool = true;
-                    for i in 1..player_hand.len() {
+                    for i in 0..player_hand.len() {
                         if allowed_move(player_hand[i], last_played) {
                             can_move = false;
                         }
