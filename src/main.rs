@@ -211,9 +211,9 @@ struct UNOCard {
 impl UNOCard {
     fn new(color: Color, special: SpecialCard, number: i8) -> Self {
         UNOCard {
-            color: color,
-            special: special,
-            number: number,
+            color,
+            special,
+            number,
         }
     }
 }
@@ -286,11 +286,11 @@ impl Game {
 // Gets the name of a color from the enum
 fn get_color(color: &Color) -> String {
     match color {
-        Color::Red => return String::from("Red"),
-        Color::Blue => return String::from("Blue"),
-        Color::Yellow => return String::from("Yellow"),
-        Color::Green => return String::from("Green"),
-        Color::NA => return String::from("None"),
+        Color::Red => String::from("Red"),
+        Color::Blue => String::from("Blue"),
+        Color::Yellow => String::from("Yellow"),
+        Color::Green => String::from("Green"),
+        Color::NA => String::from("None"),
     }
 }
 
@@ -325,7 +325,7 @@ fn build_deck() -> Vec<UNOCard> {
 }
 
 // Shuffles the deck
-fn shuffle(deck: &mut Vec<UNOCard>, rand: &mut Randler) {
+fn shuffle(deck: &mut [UNOCard], rand: &mut Randler) {
     let n = deck.len();
     for i in (1..n).rev() {
         if let Some(j) = rand.rand_range(0, i as u64) {
@@ -381,7 +381,7 @@ fn refresh_deck(deck: &mut Vec<UNOCard>, random: &mut Randler) {
 }
 
 // Checks if there are any plus fours or plus twos in the hand
-fn check_countercards(hand: &Vec<UNOCard>) -> bool {
+fn check_countercards(hand: &[UNOCard]) -> bool {
     hand.iter()
         .any(|u: &UNOCard| u.special == SpecialCard::PlusFour || u.special == SpecialCard::PlusTwo)
 }
@@ -421,19 +421,19 @@ fn clear_terminal() {
 
 // This is for the AI players
 fn get_move_ai(
-    hand: &Vec<UNOCard>,
+    hand: &[UNOCard],
     last_played: UNOCard,
     difficulty: Difficulty,
     uno: bool,
 ) -> Option<usize> {
     // To adhere to the +2 stacking force
-    if last_played.special == SpecialCard::PlusTwo && check_countercards(hand) {
-        if let Some(idx) = hand
+    if last_played.special == SpecialCard::PlusTwo
+        && check_countercards(hand)
+        && let Some(idx) = hand
             .iter()
             .position(|c| c.special == SpecialCard::PlusTwo || c.special == SpecialCard::PlusFour)
-        {
-            return Some(idx);
-        }
+    {
+        return Some(idx);
     }
 
     match difficulty {
@@ -489,13 +489,12 @@ fn get_move_ai(
         //                  - Alexandros3015, February 24th, 2026
         // Ts one is impossible without a god hand
         Difficulty::Skilled => {
-            if uno {
-                if let Some(idx) = hand
+            if uno
+                && let Some(idx) = hand
                     .iter()
                     .position(|c| c.special != SpecialCard::Base && allowed_move(*c, last_played))
-                {
-                    return Some(idx);
-                }
+            {
+                return Some(idx);
             }
 
             let (reds, blues, yellows, greens) = count_color(hand);
@@ -581,7 +580,7 @@ fn get_move_ai(
     None
 }
 
-fn count_color(hand: &Vec<UNOCard>) -> (usize, usize, usize, usize) {
+fn count_color(hand: &[UNOCard]) -> (usize, usize, usize, usize) {
     // Counts all colors
     let reds: usize = hand.iter().filter(|&card| card.color == Color::Red).count();
 
@@ -604,7 +603,7 @@ fn count_color(hand: &Vec<UNOCard>) -> (usize, usize, usize, usize) {
 }
 
 // Gets the most common color on the deck
-fn get_common_color(hand: &Vec<UNOCard>, rand: &mut Randler) -> Color {
+fn get_common_color(hand: &[UNOCard], rand: &mut Randler) -> Color {
     let (reds, blues, yellows, greens) = count_color(hand);
 
     // Returns the most common color
@@ -638,15 +637,14 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 
     let total_players: u8 = players + ai_players;
 
-    let difficulty: Difficulty;
-    if ai_players > 0 {
-        difficulty = input(
+    let difficulty: Difficulty = if ai_players > 0 {
+        input(
             "What AI difficulty? (calm, aggressive, or skilled)",
             "Please enter a proper difficulty",
-        );
+        )
     } else {
-        difficulty = Difficulty::Calm
-    }
+        Difficulty::Calm
+    };
 
     let mut rand = Randler::default();
 
@@ -797,8 +795,8 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                     ensure_deck_full(&mut deck, &mut discard, &mut rand);
 
                     let mut cannot_play: bool = true;
-                    for i in 0..player_hand.len() {
-                        if allowed_move(player_hand[i], last_played) {
+                    for i in &mut *player_hand {
+                        if allowed_move(*i, last_played) {
                             cannot_play = false;
                         }
                     }
@@ -830,12 +828,12 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
                 };
 
                 // Ensure the answer is within the bounds of the player's hand
-                if answer_usize <= 0 {
+                if answer_usize == 0 {
                     println!("Please enter a card that you can use");
                     continue;
                 }
 
-                let answer_usize = (answer_usize - 1) as usize; // Zero indexing fix
+                let answer_usize = answer_usize - 1; // Zero indexing fix
 
                 // Check if the card is valid
                 if answer_usize >= player_hand.len() {
@@ -921,7 +919,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         }
 
         // Exit the loop if a player has won (no cards left)
-        if player_hand.len() == 0 {
+        if player_hand.is_empty() {
             println!("Player #{} wins!", game_state.player_number());
             break;
         }
