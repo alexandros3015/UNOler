@@ -60,7 +60,7 @@ impl Randler {
         if seed == 0 {
             println!("Warning! A seed of 0 will result in every random value being the same.");
         }
-        Randler { seed: seed }
+        Randler { seed }
     }
 
     // Gets a seed based off of urandom
@@ -414,7 +414,6 @@ fn ensure_deck_full(deck: &mut Vec<UNOCard>, discard: &mut Vec<UNOCard>, rand: &
 // reg add HKCU\Console /v VirtualTerminalLevel /t REG_DWORD /d 1
 fn clear_terminal() {
     print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
-    use std::io::Write;
     std::io::stdout().flush().unwrap();
 }
 
