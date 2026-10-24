@@ -1,5 +1,6 @@
 use std::fmt;
 use std::io::{self, Error, ErrorKind, Result, Write};
+use std::process;
 use std::str::FromStr;
 
 fn input<T, E>(message: &str, error: &str) -> T
@@ -17,6 +18,7 @@ where
 
         if n == 0 {
             println!("0 Bytes read. Please retry the program or ensure EOF hasn't reached.");
+            process::exit(1);
         }
 
         match u_input.trim().parse::<T>() {
@@ -65,7 +67,7 @@ impl Randler {
 
     // Gets a seed based off of urandom
     #[cfg(unix)]
-    fn get_base_random_udev() -> Result<u64> {
+    pub fn get_base_random_udev() -> Result<u64> {
         use std::fs::File;
         use std::io::Read;
 
@@ -83,7 +85,7 @@ impl Randler {
         Ok(random_num)
     }
 
-    // Gets a random seed based off of bcryptprimitives
+    // Gets a random seed based off of BCryptGenRandom
     #[cfg(windows)]
     pub fn get_base_random_udev() -> Result<u64> {
         let mut buf = [0u8; 8];
@@ -254,13 +256,13 @@ impl FromStr for Difficulty {
 // Current game state, handling turns and reverses
 #[derive(Debug, Copy, Clone)]
 struct Game {
-    current_player: i8,
-    max_players: i8,
-    direction: i8,
+    current_player: isize,
+    max_players: isize,
+    direction: isize,
 }
 
 impl Game {
-    fn new(c: i8, m: i8, d: i8) -> Self {
+    fn new(c: isize, m: isize, d: isize) -> Self {
         Self {
             current_player: c,
             max_players: m,
@@ -276,7 +278,7 @@ impl Game {
         self.direction *= -1;
     }
 
-    fn player_number(&self) -> i8 {
+    fn player_number(&self) -> isize {
         self.current_player + 1
     }
 }
@@ -694,7 +696,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 
     println!("\n------------\n");
 
-    let mut game_state = Game::new(0, total_players as i8, 1); // The game state
+    let mut game_state = Game::new(0, total_players as isize, 1); // The game state
     let mut add_queue: u32 = 0; // The queue for adding cards to the next player
     let mut getting_added_to: bool; // Whether or not the player is getting cards added to them
     let mut skipped: bool = false; // Whether or not the player has been skipped
@@ -708,7 +710,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 
         let player_hand = &mut game[current_idx as usize]; // The player's hand
 
-        let is_ai: bool = current_idx >= players as i8;
+        let is_ai: bool = current_idx >= players as isize;
 
         player_hand.sort();
 
