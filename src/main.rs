@@ -52,7 +52,7 @@ impl Default for Randler {
     fn default() -> Self {
         // Bro if you went out of your way to use a custom OS not derived from Linux or Windows AND are compiling this project? That's all on you
         Self::urandom_seed_init()
-            .expect("Failed to seed from /dev/urandom or bcryptprimitives. Use new(seed) instead.")
+            .expect("Failed to seed from /dev/urandom or BCryptGenRandom. Use new(seed) instead.")
     }
 }
 
